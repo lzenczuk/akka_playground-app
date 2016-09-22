@@ -1,0 +1,11 @@
+### Intellij IDEA
+.idea/
+
+### SBT
+target/
+lib_managed/
+src_managed/
+project/boot/
+.history
+.cache
+
