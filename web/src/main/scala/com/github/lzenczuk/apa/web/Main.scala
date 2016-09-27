@@ -23,6 +23,7 @@ object Main extends App {
   val route =
     path("") {
       get {
+        system.actorSelection("/user/wsConnectionActor_*") ! CorrectMessage(System.currentTimeMillis(), "REST message")
         complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Hello akka web app</h1"))
       }
     } ~
