@@ -24,36 +24,16 @@ object WebSocketService {
     val connectionActor: ActorRef = system.actorOf(Props[WsConnectionActor], s"wsConnectionActor_${System.currentTimeMillis()}")
     val connectionPublisher: Publisher[AppMessage] = ActorPublisher[AppMessage](connectionActor)
 
-    Flow.fromGraph(GraphDSL.create(){
-      implicit builder =>
+    val actorSink = Flow[Message].map{
+      case TextMessage.Strict(txt) => CorrectMessage(System.currentTimeMillis(), txt)
+      case _ => UnsupportedMessage(System.currentTimeMillis())
+    }.to(Sink.actorRef[AppMessage](connectionActor, ConnectionClosed))
 
-        import GraphDSL.Implicits._
-
-        val wsMessageToAppMessageFlow = builder.add(Flow[Message].map{
-          case TextMessage.Strict(txt) => CorrectMessage(System.currentTimeMillis(), txt)
-          case _ => UnsupportedMessage(System.currentTimeMillis())
-        })
-
-        val appMessageToToMessageFlow = builder.add(Flow[AppMessage].map{
-          case CorrectMessage(_, content) => TextMessage.Strict(content)
-        })
-
-        val connectionSink: SinkShape[AppMessage] = builder.add(Sink.actorRef[AppMessage](connectionActor, ConnectionClosed))
-
-        val connectionSource: SourceShape[AppMessage] = builder.add(Source.fromPublisher(connectionPublisher))
-
-        // Not for production - println is synchronous
-        val appMessageLogFlow = builder.add(Flow[AppMessage].map(am => {
-          println(s"Message: $am")
-          am
-        }))
-
-        wsMessageToAppMessageFlow.out ~> appMessageLogFlow ~> connectionSink
-        connectionSource ~> appMessageToToMessageFlow.in
-
-        FlowShape(wsMessageToAppMessageFlow.in, appMessageToToMessageFlow.out)
-
+    val actorSource = Source.fromPublisher(connectionPublisher).via(Flow[AppMessage].map{
+      case CorrectMessage(_, content) => TextMessage.Strict(content)
     })
+
+    Flow.fromSinkAndSource(actorSink, actorSource)
   }
 
 }
