@@ -82,7 +82,7 @@ class CrawlerActor(private var httpFlow:CrawlerHttpClientFlow) extends ActorPubl
 
   val queue: mutable.Queue[(HttpRequest, ActorRef)] = mutable.Queue()
 
-  Source.fromPublisher(ActorPublisher(self)).via(httpFlow).to(Sink.actorRef(self, HttpStreamClosed))
+  Source.fromPublisher(ActorPublisher(self)).via(httpFlow).to(Sink.actorRef(self, HttpStreamClosed)).run()
 
   override def receive = {
 
@@ -105,18 +105,17 @@ class CrawlerActor(private var httpFlow:CrawlerHttpClientFlow) extends ActorPubl
     // ActorPublisher messages
     case Request(cnt) =>
       publishIfNeeded()
-    case Cancel => println("Receive cancel")
+    case Cancel =>
       context.stop(self)
 
     // Stream end message
-    case HttpStreamClosed => println("Connection closed")
+    case HttpStreamClosed =>
       context.stop(self)
     case _ => println("Unknown message")
   }
 
   def publishIfNeeded() = {
     while (queue.nonEmpty && isActive && totalDemand > 0) {
-      println("On next")
       onNext(queue.dequeue())
     }
   }
